@@ -1,4 +1,4 @@
-# 🔑 Digital Door Lock System (Zynq UltraScale+)
+# 🔑 Digital Door Lock System
 
 This project implements a **Digital Door Lock** with a **Finite State Machine (FSM)** controller designed for the **Zynq UltraScale+ MPSoC** platform using **Vivado 2024.1**.
 
