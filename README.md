@@ -27,46 +27,62 @@ This project implements a **Digital Door Lock** with a **Finite State Machine (F
     * Run Synthesis, Implementation, and **Generate Bitstream** for your target board.
 
 ### 🔍 File Structure
-// Digital_Door_Lock_verilog_files.v
-// All Verilog source files for the Digital Door Lock project
-// Included modules:
-//  - top_module
-//  - password_rom
-//  - fsm_controller
-//  - status_display
-//
-// Image references (snapshots from your Vivado project):
-//  - /mnt/data/Screenshot 2025-11-19 135610.png
-//  - /mnt/data/Screenshot 2025-11-19 135738.png
-//  - /mnt/data/Screenshot 2025-11-19 135756.png
-//
-// You can copy each module into its own .v file if desired.
+📐 Block Diagram
 
+(Upload images into your GitHub repository and replace the paths below.)
 
-// =============================================================
-// top_module.v
-// Top-level wrapper that instantiates FSM, ROM and display
-// =============================================================
+/mnt/data/Screenshot 2025-11-19 135610.png
+/mnt/data/Screenshot 2025-11-19 135738.png
+/mnt/data/Screenshot 2025-11-19 135756.png
+
+✨ Features
+
+🔒 4-digit programmable password
+
+⚡ Fast, hardware-based FSM
+
+🧮 ROM-based password storage
+
+🚨 Alarm on incorrect password
+
+🔑 Unlock indicator using LEDs
+
+🧱 Clean modular Verilog architecture
+
+🧵 AXI-Lite integration (ready for PS software control)
+
+🛠 Hardware Design
+
+The design uses a Finite State Machine (FSM) with the following states:
+
+State	Description
+IDLE	waiting for digit input
+CHECK	compares current digit with ROM value
+UNLOCKED	password correct
+ALARM	password incorrect
+
+Clock frequency used: 196 MHz
+
+Vivado tool automatically applied the required timing constraints.
+
+📂 Verilog Source Files
+1️⃣ top_module.v
 module top_module (
     input clk,
     input rst,
     input [3:0] input_digit,
-    input enter,        // pulse when a digit is entered
-    output [6:0] led    // 7-seg style output (MSB..LSB)
+    input enter,
+    output [6:0] led
 );
     wire unlocked, alarm;
-
-    // Small address/idx bus used by FSM to read ROM
     wire [1:0] rom_addr;
     wire [3:0] rom_data;
 
-    // Instantiate password ROM (4-entry ROM)
     password_rom rom (
         .addr(rom_addr),
         .data(rom_data)
     );
 
-    // Instantiate FSM controller
     fsm_controller fsm (
         .clk(clk),
         .rst(rst),
@@ -78,7 +94,6 @@ module top_module (
         .alarm(alarm)
     );
 
-    // Instantiate display driver
     status_display display (
         .unlocked(unlocked),
         .alarm(alarm),
@@ -86,11 +101,7 @@ module top_module (
     );
 endmodule
 
-
-// =============================================================
-// password_rom.v
-// 2-bit address -> 4-bit digit data
-// =============================================================
+2️⃣ password_rom.v
 module password_rom (
     input [1:0] addr,
     output reg [3:0] data
@@ -106,17 +117,7 @@ module password_rom (
     end
 endmodule
 
-
-// =============================================================
-// fsm_controller.v
-// Simple synchronous FSM to check a 4-digit password against ROM
-// Behavior:
-//  - On 'enter' pulse: capture input_digit and compare to ROM at current index
-//  - If match, increment index; if index reaches CODE_LEN -> unlocked
-//  - On mismatch -> alarm asserted and index frozen until reset
-//  - rst clears state and index
-// Notes: This is a compact, clear behavioral reference implementation
-// =============================================================
+3️⃣ fsm_controller.v
 module fsm_controller (
     input clk,
     input rst,
@@ -127,76 +128,92 @@ module fsm_controller (
     output reg unlocked,
     output reg alarm
 );
-    // Parameters
     localparam CODE_LEN = 4;
-
-    // index tracks which digit we are checking (0..CODE_LEN-1)
     reg [1:0] index;
-
-    // simple edge-detect for enter (assumes enter is a single-cycle pulse from PS or debounced button)
-    // If enter may be multi-cycle, ensure external debouncing or implement pulse stretching here.
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            index <= 2'd0;
-            rom_addr <= 2'd0;
-            unlocked <= 1'b0;
-            alarm <= 1'b0;
-        end else begin
-            if (unlocked || alarm) begin
-                // Once in terminal state (unlocked or alarm), ignore further enters until reset
-                rom_addr <= rom_addr; // hold
-                index <= index;
-            end else if (enter) begin
-                // Compare input with ROM data at current address
-                if (input_digit == rom_data) begin
-                    // correct digit
-                    if (index == (CODE_LEN-1)) begin
-                        unlocked <= 1'b1;
-                        index <= index; // final
-                        rom_addr <= rom_addr; // final
-                    end else begin
-                        index <= index + 1'b1;
-                        rom_addr <= rom_addr + 1'b1;
-                    end
-                end else begin
-                    // incorrect digit -> alarm
-                    alarm <= 1'b1;
+            index <= 0;
+            rom_addr <= 0;
+            unlocked <= 0;
+            alarm <= 0;
+        end 
+        else if (!unlocked && !alarm && enter) begin
+            if (input_digit == rom_data) begin
+                if (index == CODE_LEN-1)
+                    unlocked <= 1;
+                else begin
+                    index <= index + 1;
+                    rom_addr <= rom_addr + 1;
                 end
             end else begin
-                // no enter pulse: hold
-                index <= index;
-                rom_addr <= rom_addr;
+                alarm <= 1;
             end
         end
     end
 endmodule
 
-
-// =============================================================
-// status_display.v
-// Maps unlocked/alarm signals to a 7-bit LED / 7-seg-like bus
-// Simple mapping used for demonstration; change patterns as desired
-// =============================================================
+4️⃣ status_display.v
 module status_display (
     input unlocked,
     input alarm,
     output reg [6:0] led
 );
     always @(*) begin
-        if (unlocked) begin
-            // Show "U" pattern (example) when unlocked
-            // 7-bit segments [6:0] arbitrary mapping for your board
-            led = 7'b0111110; // example pattern
-        end else if (alarm) begin
-            // Show "A" or blinking pattern for alarm
-            led = 7'b1000001; // example pattern
-        end else begin
-            // idle: all segments off
-            led = 7'b0000000;
-        end
+        if (unlocked)
+            led = 7'b0111110;   // U
+        else if (alarm)
+            led = 7'b1000001;   // A
+        else
+            led = 7'b0000000;   // OFF
     end
 endmodule
 
+📊 Implementation & Results
 
-// End of file
+Vivado console output confirms:
+
+Block design loaded successfully
+
+Addresses validated
+
+Clock configuration completed at 196 MHz
+
+AXI interconnect correctly mapped
+
+🧪 How to Build
+1. Clone the repository
+git clone https://github.com/yourname/DigitalDoorLock.git
+
+2. Open Vivado
+File → Open Project → select .xpr
+
+3. Generate Bitstream
+Flow → Generate Bitstream
+
+4. Export Hardware to Vitis
+File → Export Hardware → Include bitstream
+
+5. Program FPGA
+
+Use Vitis or XSCT.
+
+🚀 Future Improvements
+
+Add UART-based password entry
+
+Add reprogrammable password storage
+
+Integrate PMOD keypad
+
+Add OLED display for UI
+
+Add retry limit + timeout features
+
+🖼 Screenshots
+
+You can upload the images to GitHub and reference them:
+
+![Block Diagram](images/block_design.png)
+![Address Map](images/address_map.png)
+![Vivado Console](images/vivado_log.png)
